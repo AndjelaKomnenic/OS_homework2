@@ -80,8 +80,9 @@ CC = $(TOOLPREFIX)gcc
 AS = $(TOOLPREFIX)gas
 LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
+STRIPNOTES = -R '.note' -R '.note.*'
 OBJDUMP = $(TOOLPREFIX)objdump
-CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -Og -Wall -ggdb -m32 -fno-omit-frame-pointer -I.
+CFLAGS = -mgeneral-regs-only -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -ggdb -m32 -fno-omit-frame-pointer -I.
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 ASFLAGS = -m32 -I. -gdwarf-2 -Wa,-divide
 # FreeBSD ld wants ``elf_i386_fbsd''
@@ -104,6 +105,9 @@ all: xv6.img fs.img
 # Ensure that any header changes cause all sources to be recompiled.
 %.o: %.c
 	$(MKDEPDIR)
+	$(CC) -c $(CFLAGS) -o $@t $<
+	$(OBJCOPY) $(STRIPNOTES) $@t $@
+	rm $@t
 
 %.o: %.S
 	$(MKDEPDIR)
@@ -124,20 +128,20 @@ $B/bootblock: $B/bootasm.S $B/bootmain.c
 	$(CC) $(CFLAGS) -MF .deps/$(@D)-1 -fno-pic -O -nostdinc -I. -c $B/bootmain.c -o $B/bootmain.o
 	$(CC) $(CFLAGS) -MF .deps/$(@D)-2 -fno-pic -nostdinc -I. -c $B/bootasm.S -o $B/bootasm.o
 	$(LD) $(LDFLAGS) -N -e start -Ttext 0x7C00 -o $B/bootblock.o $B/bootasm.o $B/bootmain.o
-	$(OBJCOPY) -S -O binary -j .text $B/bootblock.o $B/bootblock
+	$(OBJCOPY) $(STRIPNOTES) -S -O binary -j .text $B/bootblock.o $B/bootblock
 	$T/sign.pl $B/bootblock
 
 $K/entryother: $K/entryother.S
 	$(MKDEPDIR)
 	$(CC) $(CFLAGS) -fno-pic -nostdinc -I. -c $K/entryother.S -o $K/entryother.o
 	$(LD) $(LDFLAGS) -N -e start -Ttext 0x7000 -o $B/bootblockother.o $K/entryother.o
-	$(OBJCOPY) -S -O binary -j .text $B/bootblockother.o $K/entryother
+	$(OBJCOPY) $(STRIPNOTES) -S -O binary -j .text $B/bootblockother.o $K/entryother
 
 $U/initcode: $U/initcode.S
 	$(MKDEPDIR)
 	$(CC) $(CFLAGS) -nostdinc -I. -c $U/initcode.S -o $U/initcode.o
 	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o $U/initcode.out $U/initcode.o
-	$(OBJCOPY) -S -O binary $U/initcode.out $U/initcode
+	$(OBJCOPY) -S $(STRIPNOTES) -O binary $U/initcode.out $U/initcode
 
 $K/kernel: $(OBJS) $K/entry.o $K/entryother $U/initcode $K/kernel.ld
 	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $K/entry.o $(OBJS) -b binary $U/initcode $K/entryother
