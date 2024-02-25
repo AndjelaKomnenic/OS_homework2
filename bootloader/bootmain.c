@@ -35,6 +35,8 @@ bootmain(void)
 	ph = (struct proghdr*)((uchar*)elf + elf->phoff);
 	eph = ph + elf->phnum;
 	for(; ph < eph; ph++){
+		if (ph->type != ELF_PROG_LOAD)
+			continue;
 		pa = (uchar*)ph->paddr;
 		readseg(pa, ph->filesz, ph->off);
 		if(ph->memsz > ph->filesz)
