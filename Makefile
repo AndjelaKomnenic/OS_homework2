@@ -3,30 +3,6 @@ K=kernel
 U=user
 T=tools
 
-HDRS = \
-	$K/asm.h\
-	$K/buf.h\
-	$K/date.h\
-	$K/defs.h\
-	$K/elf.h\
-	$K/fcntl.h\
-	$K/file.h\
-	$K/fs.h\
-	$K/kbd.h\
-	$K/memlayout.h\
-	$K/mmu.h\
-	$K/mp.h\
-	$K/param.h\
-	$K/proc.h\
-	$K/sleeplock.h\
-	$K/spinlock.h\
-	$K/stat.h\
-	$K/syscall.h\
-	$K/traps.h\
-	$K/types.h\
-	$K/x86.h\
-	$U/user.h\
-
 OBJS = \
 	$K/bio.o\
 	$K/console.o\
@@ -119,13 +95,18 @@ ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]nopie'),)
 CFLAGS += -fno-pie -nopie
 endif
 
+# Enable dependency tracking
+override CFLAGS += -MMD -MF .deps/$@ -MT $@
+MKDEPDIR = mkdir -p .deps/$(@D)
+
 all: xv6.img fs.img
 
 # Ensure that any header changes cause all sources to be recompiled.
-%.o: %.c $(HDRS)
-	$(CC) -c $(CFLAGS) -o $@ $<
+%.o: %.c
+	$(MKDEPDIR)
 
-%.o: %.S $(HDRS)
+%.o: %.S
+	$(MKDEPDIR)
 	$(CC) -c $(ASFLAGS) -o $@ $<
 
 xv6.img: $B/bootblock $K/kernel
@@ -139,18 +120,21 @@ xv6memfs.img: $B/bootblock $K/kernelmemfs
 	dd if=$K/kernelmemfs of=xv6memfs.img seek=1 conv=notrunc
 
 $B/bootblock: $B/bootasm.S $B/bootmain.c
-	$(CC) $(CFLAGS) -fno-pic -O -nostdinc -I. -c $B/bootmain.c -o $B/bootmain.o
-	$(CC) $(CFLAGS) -fno-pic -nostdinc -I. -c $B/bootasm.S -o $B/bootasm.o
+	$(MKDEPDIR)
+	$(CC) $(CFLAGS) -MF .deps/$(@D)-1 -fno-pic -O -nostdinc -I. -c $B/bootmain.c -o $B/bootmain.o
+	$(CC) $(CFLAGS) -MF .deps/$(@D)-2 -fno-pic -nostdinc -I. -c $B/bootasm.S -o $B/bootasm.o
 	$(LD) $(LDFLAGS) -N -e start -Ttext 0x7C00 -o $B/bootblock.o $B/bootasm.o $B/bootmain.o
 	$(OBJCOPY) -S -O binary -j .text $B/bootblock.o $B/bootblock
 	$T/sign.pl $B/bootblock
 
 $K/entryother: $K/entryother.S
+	$(MKDEPDIR)
 	$(CC) $(CFLAGS) -fno-pic -nostdinc -I. -c $K/entryother.S -o $K/entryother.o
 	$(LD) $(LDFLAGS) -N -e start -Ttext 0x7000 -o $B/bootblockother.o $K/entryother.o
 	$(OBJCOPY) -S -O binary -j .text $B/bootblockother.o $K/entryother
 
 $U/initcode: $U/initcode.S
+	$(MKDEPDIR)
 	$(CC) $(CFLAGS) -nostdinc -I. -c $U/initcode.S -o $U/initcode.o
 	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o $U/initcode.out $U/initcode.o
 	$(OBJCOPY) -S -O binary $U/initcode.out $U/initcode
@@ -219,6 +203,7 @@ clean:
 	$U/initcode $U/initcode.out $K/kernel xv6.img fs.img $K/kernelmemfs \
 	xv6memfs.img $T/mkfs .gdbinit \
 	$(UPROGS)
+	rm -rf .deps
 
 # try to generate a unique GDB port
 GDBPORT = $(shell expr `id -u` % 5000 + 25000)
@@ -250,3 +235,6 @@ qemu-gdb: fs.img xv6.img .gdbinit
 qemu-nox-gdb: fs.img xv6.img .gdbinit
 	@echo "*** Now run 'gdb'." 1>&2
 	$(QEMU) -serial mon:stdio -nographic $(QEMUOPTS) -S $(QEMUGDB)
+
+# Include the -MMD dependency files.
+-include $(shell [ -d .deps ] && find .deps -type f)

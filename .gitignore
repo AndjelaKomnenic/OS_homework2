@@ -12,6 +12,7 @@ initcode
 initcode.out
 kernel/kernel
 kernel/kernelmemfs
+/.deps
 mkfs
 .gdbinit
 TAGS
