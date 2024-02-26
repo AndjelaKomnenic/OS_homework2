@@ -97,6 +97,7 @@ endif
 override CFLAGS += -MMD -MF .deps/$@ -MT $@
 MKDEPDIR = mkdir -p .deps/$(@D)
 
+.PHONY: all
 all: xv6.img fs.img
 
 # Ensure that any header changes cause all sources to be recompiled.
@@ -198,7 +199,8 @@ UPROGS=\
 fs.img: $T/mkfs README $(UPROGS)
 	$T/mkfs fs.img README $(UPROGS)
 
-clean: 
+.PHONY: clean
+clean:
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*/*.o */*.d */*.asm */*.sym $K/vectors.S $B/bootblock $K/entryother \
 	$U/initcode $U/initcode.out $K/kernel xv6.img fs.img $K/kernelmemfs \
@@ -217,22 +219,27 @@ CPUS := 1
 endif
 QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA)
 
+.PHONY: qemu
 qemu: fs.img xv6.img
 	$(QEMU) $(QEMUOPTS)
 
+.PHONY: qemu-memfs
 qemu-memfs: xv6memfs.img
 	$(QEMU) -drive file=xv6memfs.img,index=0,media=disk,format=raw -smp $(CPUS) -m 256
 
+.PHONY: qemu-nox
 qemu-nox: fs.img xv6.img
 	$(QEMU) -serial mon:stdio -nographic $(QEMUOPTS)
 
 .gdbinit: .gdbinit.tmpl
 	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
 
+.PHONY: qemu-gdb
 qemu-gdb: fs.img xv6.img .gdbinit
 	@echo "*** Now run 'gdb'." 1>&2
 	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
 
+.PHONY: qemu-nox-gdb
 qemu-nox-gdb: fs.img xv6.img .gdbinit
 	@echo "*** Now run 'gdb'." 1>&2
 	$(QEMU) -serial mon:stdio -nographic $(QEMUOPTS) -S $(QEMUGDB)
