@@ -292,7 +292,7 @@ void strremove(char a[])
             break;
         }
     }
-	
+
     if(j != -1){
     	a[j]='\0';
     }else{
@@ -362,7 +362,7 @@ sys_open(void)
 				}
 
 				if((ip = namei(path)) == 0){
-					end_op(ROOTDEV);
+					end_op();
 					return -1;
 				}
 				if(strlen(test)!=0){
