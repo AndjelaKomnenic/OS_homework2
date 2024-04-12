@@ -281,6 +281,25 @@ create(char *path, short type, short major, short minor)
 	return ip;
 }
 
+void strremove(char a[])
+{
+    int k = strlen(a);
+    int j = -1;
+
+    for(int i = k - 1; i >= 0; i--){
+        if(a[i] == '/'){
+            j = i + 1;
+            break;
+        }
+    }
+	
+    if(j != -1){
+    	a[j]='\0';
+    }else{
+        a[0]='\0';
+    }
+}
+
 int
 sys_open(void)
 {
@@ -288,6 +307,7 @@ sys_open(void)
 	int fd, omode;
 	struct file *f;
 	struct inode *ip;
+	struct inode *currentip;
 
 	if(argstr(0, &path) < 0 || argint(1, &omode) < 0)
 		return -1;
@@ -307,14 +327,58 @@ sys_open(void)
 		}
 		ilock(ip);
 		if (ip->type == T_SYMLINK && omode != O_NOFOLLOW){
+			char test[123];
+         	strncpy(test,path,123);
+            strremove(test);
+
             int count = 0;
             while (ip->type == T_SYMLINK && count < 10) {
                     readi(ip, path, 0, ip->size);
                     iunlockput(ip);
-                if((ip = namei(path)) == 0){
+                /*if((ip = namei(path)) == 0){
                     end_op();
                     return -1;
-                }
+                }*/
+				struct proc *curproc = myproc();
+
+				if(strlen(test)!=0){
+					begin_op();
+					if((ip = namei(test)) == 0){
+						end_op();
+						return -1;
+					}
+					ilock(ip);
+					if(ip->type != T_DIR){
+						iunlockput(ip);
+						end_op();
+						return -1;
+					}
+					iunlock(ip);
+					iput(curproc->cwd);
+					end_op();
+
+					currentip=curproc->cwd;
+					curproc->cwd = ip;
+				}
+
+				if((ip = namei(path)) == 0){
+					end_op(ROOTDEV);
+					return -1;
+				}
+				if(strlen(test)!=0){
+					begin_op();
+
+					ilock(currentip);
+					if(currentip->type != T_DIR){
+						iunlockput(ip);
+						end_op();
+						return -1;
+					}
+					iunlock(currentip);
+					iput(curproc->cwd);
+					end_op();
+					curproc->cwd = currentip;
+				}
                 ilock(ip);
                 count++;
             }
