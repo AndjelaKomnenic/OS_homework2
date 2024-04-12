@@ -293,7 +293,7 @@ sys_open(void)
 		return -1;
 
 	begin_op();
-
+	
 	if(omode & O_CREATE){
 		ip = create(path, T_FILE, 0, 0);
 		if(ip == 0){
@@ -312,7 +312,7 @@ sys_open(void)
                     readi(ip, path, 0, ip->size);
                     iunlockput(ip);
                 if((ip = namei(path)) == 0){
-                    end_op(ROOTDEV);
+                    end_op();
                     return -1;
                 }
                 ilock(ip);
@@ -321,11 +321,12 @@ sys_open(void)
             if (count >= 10) {
                 cprintf("Cycle!\n");
                 iunlockput(ip);
-                end_op(ROOTDEV);
+                end_op();
                 return -1;
             }
         }
-		if(ip->type == T_DIR && omode != O_RDONLY && omode != O_NOFOLLOW){
+		
+		if((ip->type == T_DIR || ip->type==T_SYMLINK) && omode != O_RDONLY && omode != O_NOFOLLOW){
 			iunlockput(ip);
 			end_op();
 			return -1;

@@ -442,6 +442,28 @@ stati(struct inode *ip, struct stat *st)
 	st->type = ip->type;
 	st->nlink = ip->nlink;
 	st->size = ip->size;
+	st->blocks = 0;
+
+    for(int i = 0; i < NDIRECT; i++){
+        if(ip->addrs[i]){
+            st->blocks+=1;
+        }
+    }
+
+    if (ip->addrs[NDIRECT]){
+    	struct buf *bp;
+    
+		bp = bread(ip->dev, ip->addrs[NDIRECT]);
+    	uint* a;
+    	a = (uint*)bp->data;
+    	for(int j = 0; j < NINDIRECT; j++){
+    		if(a[j])
+        		st->blocks+=1;
+    	}
+
+    	brelse(bp);
+
+    }
 }
 
 // Read data from inode.
